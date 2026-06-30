@@ -1,0 +1,60 @@
+# ===========================
+# Node modules
+# ===========================
+js/node_modules/
+js/package-lock.json
+js/package.json
+
+# ===========================
+# Vendor (Composer)
+# ===========================
+vendor/
+
+# ===========================
+# Sensitive Files - CRITICAL
+# ===========================
+credentials
+client_secret_*.json
+*.env
+*.pem
+*_secret_*
+google-auth.php
+
+# ===========================
+# Database Backups
+# ===========================
+backups/
+settings/actions/backups/
+*.sql
+
+# ===========================
+# Upload Folders
+# ===========================
+product/uploads/
+assets/images/avatars/
+Shop/assets/images/avatars/
+
+# ===========================
+# IDE Files
+# ===========================
+.vscode/
+.idea/
+*.sublime-*
+
+# ===========================
+# OS Files
+# ===========================
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+
+# ===========================
+# Configuration Files
+# ===========================
+dbconn.php
+
+# ===========================
+# Composer
+# ===========================
+composer.lock
