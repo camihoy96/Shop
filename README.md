@@ -294,7 +294,7 @@ Shop/
 
 **Charlie Amihoy**
 
-Bachelor of Science in Information Technology
+Bachelor of Science in Computer Science
 
 ---
 
