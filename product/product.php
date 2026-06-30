@@ -1118,7 +1118,81 @@ $user_id = intval($_SESSION['user_id'])
             min-width: 16px;
             height: 16px;
         }
+/* Toast Notifications */
+.toast {
+    padding: 16px 20px;
+    border-radius: 8px;
+    color: white;
+    font-weight: 500;
+    min-width: 300px;
+    max-width: 400px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    animation: slideInRight 0.3s ease, fadeOut 0.3s ease 2.7s;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-family: 'Montserrat', sans-serif;
+}
 
+.toast-success {
+    background: linear-gradient(135deg, #28a745, #20c997);
+    border-left: 4px solid #1e7e34;
+}
+
+.toast-error {
+    background: linear-gradient(135deg, #dc3545, #e74c3c);
+    border-left: 4px solid #a71d2a;
+}
+
+.toast-warning {
+    background: linear-gradient(135deg, #ffc107, #fd7e14);
+    border-left: 4px solid #d39e00;
+    color: #333;
+}
+
+.toast-info {
+    background: linear-gradient(135deg, #17a2b8, #0dcaf0);
+    border-left: 4px solid #117a8b;
+}
+
+.toast i {
+    font-size: 20px;
+}
+
+.toast-content {
+    flex: 1;
+}
+
+.toast-title {
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 2px;
+}
+
+.toast-message {
+    font-size: 13px;
+    opacity: 0.9;
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes fadeOut {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0;
+    }
+}
     </style>
 </head>
 <body>
@@ -1730,14 +1804,134 @@ while($row = $category_result->fetch_assoc()) {
         </form>
     </div>
 </div>
+<!-- Delete Confirmation Modal -->
+<div id="deleteConfirmModal" class="modal" style="display:none;">
+    <div class="modal-content" style="width: 450px; max-width: 90%;">
+        <div class="modal-header" style="border-bottom: 2px solid var(--danger);">
+            <h3 style="color: var(--danger);">
+                <i class="fa-solid fa-triangle-exclamation"></i> Confirm Delete
+            </h3>
+            <button class="close-btn" onclick="closeDeleteModal()">&times;</button>
+        </div>
+        
+        <div style="padding: 25px; text-align: center;">
+            <div style="font-size: 48px; color: var(--danger); margin-bottom: 20px;">
+                <i class="fa-solid fa-trash-can"></i>
+            </div>
+            
+            <p style="font-size: 16px; color: var(--dark); margin-bottom: 15px;">
+                Are you sure you want to delete this product?
+            </p>
+            
+            <div id="deleteProductName" style="font-weight: bold; font-size: 18px; color: var(--primary); margin-bottom: 10px; padding: 10px; background: var(--light); border-radius: 6px;">
+                <!-- Product name will be inserted here -->
+            </div>
+            
+            <p style="font-size: 14px; color: var(--danger); margin-bottom: 25px;">
+                <i class="fa-solid fa-circle-exclamation"></i> 
+                This action cannot be undone. All product data including images and features will be permanently deleted.
+            </p>
+            
+            <div style="display: flex; gap: 10px;">
+                <button onclick="closeDeleteModal()" class="btn" style="flex: 1; background: var(--gray);">
+                    <i class="fa-solid fa-times"></i> Cancel
+                </button>
+                <button id="confirmDeleteBtn" class="btn" style="flex: 1; background: var(--danger);">
+                    <i class="fa-solid fa-trash"></i> Delete Product
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Notification Container -->
+<div id="toastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px;"></div>
  <script>
-// Toggle dropdown
+// ====================================
+// TOAST NOTIFICATION SYSTEM
+// ====================================
+function showToast(type, title, message, duration = 3000) {
+    const container = document.getElementById('toastContainer');
+    if (!container) {
+        console.error('Toast container not found!');
+        return;
+    }
+    
+    const icons = {
+        success: 'fa-circle-check',
+        error: 'fa-circle-xmark',
+        warning: 'fa-triangle-exclamation',
+        info: 'fa-circle-info'
+    };
+    
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.innerHTML = `
+        <i class="fa-solid ${icons[type] || icons.info}"></i>
+        <div class="toast-content">
+            <div class="toast-title">${title}</div>
+            ${message ? `<div class="toast-message">${message}</div>` : ''}
+        </div>
+    `;
+    
+    container.appendChild(toast);
+    
+    setTimeout(() => {
+        if (toast.parentNode) {
+            toast.remove();
+        }
+    }, duration);
+}
+
+// ====================================
+// DELETE CONFIRMATION MODAL
+// ====================================
+let pendingDeleteData = null;
+
+function openDeleteModal(productId, productName) {
+    pendingDeleteData = { id: productId, name: productName };
+    document.getElementById('deleteProductName').textContent = productName;
+    
+    const deleteBtn = document.getElementById('confirmDeleteBtn');
+    deleteBtn.innerHTML = '<i class="fa-solid fa-trash"></i> Delete Product';
+    deleteBtn.disabled = false;
+    
+    document.getElementById('deleteConfirmModal').style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function closeDeleteModal() {
+    document.getElementById('deleteConfirmModal').style.display = 'none';
+    document.body.style.overflow = 'auto';
+    pendingDeleteData = null;
+}
+
+// Close delete modal when clicking outside
+document.addEventListener('click', function(e) {
+    const deleteModal = document.getElementById('deleteConfirmModal');
+    if (deleteModal && e.target === deleteModal) {
+        closeDeleteModal();
+    }
+});
+
+// Close delete modal with Escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        const deleteModal = document.getElementById('deleteConfirmModal');
+        if (deleteModal && deleteModal.style.display === 'flex') {
+            closeDeleteModal();
+        }
+    }
+});
+
+// ====================================
+// DROPDOWN TOGGLE
+// ====================================
 function toggleDropdown() {
     const menu = document.getElementById('dropdownMenu');
     menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
 }
 
-// Close dropdown when clicking outside
 window.addEventListener('click', function(e) {
     const dropdown = document.querySelector('.user-dropdown');
     if (dropdown && !dropdown.contains(e.target)) {
@@ -1745,18 +1939,18 @@ window.addEventListener('click', function(e) {
     }
 });
 
-// Category Filtering
+// ====================================
+// CATEGORY FILTERING
+// ====================================
 document.querySelectorAll('.category-btn').forEach(button => {
     button.addEventListener('click', function() {
         const category = this.getAttribute('data-category');
         
-        // Update active state
         document.querySelectorAll('.category-btn').forEach(btn => {
             btn.classList.remove('active');
         });
         this.classList.add('active');
         
-        // Filter products
         const productItems = document.querySelectorAll('.product-item');
         productItems.forEach(item => {
             if (category === 'all' || item.getAttribute('data-category') === category) {
@@ -1776,13 +1970,13 @@ document.querySelectorAll('.category-btn').forEach(button => {
     });
 });
 
-// Add Product Button click - Show category selection modal
+// ====================================
+// ADD PRODUCT BUTTONS
+// ====================================
 document.getElementById('addProductBtn').addEventListener('click', function() {
-    // Show category selection modal first
     document.getElementById('categoryModal').style.display = 'flex';
 });
 
-// Add First Item Button click
 const addFirstItemBtn = document.getElementById('addFirstItemBtn');
 if (addFirstItemBtn) {
     addFirstItemBtn.addEventListener('click', function() {
@@ -1790,21 +1984,19 @@ if (addFirstItemBtn) {
     });
 }
 
-// Category selection in modal
+// ====================================
+// CATEGORY SELECTION IN MODAL
+// ====================================
 document.querySelectorAll('.category-select-btn').forEach(button => {
     button.addEventListener('click', function() {
         const category = this.getAttribute('data-category');
         
         if (category === 'new') {
-            // Prompt for new category name
             const newCategory = prompt('Enter new category name:');
             if (newCategory) {
-                // Add to categories table (NO dummy product)
                 fetch('add_category.php', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
                         category: newCategory,
                         action: 'add_category'
@@ -1813,37 +2005,37 @@ document.querySelectorAll('.category-select-btn').forEach(button => {
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        // Reload the page to show new category
-                        location.reload();
+                        showToast('success', 'Category Created', `"${newCategory}" category has been added successfully.`);
+                        setTimeout(() => location.reload(), 1500);
                     } else {
-                        alert('Error creating category: ' + data.message);
+                        showToast('error', 'Error', data.message || 'Failed to create category.');
                     }
                 })
                 .catch(error => {
                     console.error('Error:', error);
-                    alert('An error occurred while creating the category.');
+                    showToast('error', 'Error', 'An error occurred while creating the category.');
                 });
             }
         } else {
-            // Close category modal and open product modal with selected category
             closeCategoryModal();
             openProductModal(category);
         }
     });
 });
 
+// ====================================
+// PRODUCT MODAL FUNCTIONS
+// ====================================
 function openProductModal(category) {
     const modal = document.getElementById('productModal');
     const form = document.getElementById('productForm');
     
-    // Reset form
     form.reset();
     document.getElementById('productId').value = '';
     document.getElementById('modalTitle').innerHTML = '<i class="fa-solid fa-box"></i> Add Product';
     document.getElementById('imagePreview').innerHTML = '';
     document.getElementById('featuredImageContainer').style.display = 'none';
     
-    // Reset features to one
     const featuresContainer = document.getElementById('featuresContainer');
     featuresContainer.innerHTML = `
         <div class="feature-input-group" style="display: flex; gap: 10px; margin-bottom: 10px;">
@@ -1854,26 +2046,22 @@ function openProductModal(category) {
         </div>
     `;
     
-    // Set the category (hidden field)
     const categoryField = document.createElement('input');
     categoryField.type = 'hidden';
     categoryField.name = 'category';
     categoryField.value = category;
     categoryField.id = 'selectedCategory';
     
-    // Remove existing hidden category field if exists
     const existingField = document.getElementById('selectedCategory');
     if (existingField) existingField.remove();
     
     form.appendChild(categoryField);
     
-    // Display selected category info
     const categoryInfo = document.getElementById('categoryInfoDisplay');
     const categoryName = document.getElementById('selectedCategoryName');
     categoryName.textContent = category.charAt(0).toUpperCase() + category.slice(1).replace('-', ' ');
     categoryInfo.style.display = 'block';
     
-    // Show modal
     modal.style.display = 'flex';
 }
 
@@ -1885,12 +2073,13 @@ function closeProductModal() {
     document.getElementById('productModal').style.display = 'none';
 }
 
-// Close modal buttons
 document.getElementById('closeModal').addEventListener('click', function() {
     closeProductModal();
 });
 
-// Add Feature functionality
+// ====================================
+// ADD FEATURE FUNCTIONALITY
+// ====================================
 document.getElementById('addFeatureBtn').addEventListener('click', function() {
     const container = document.getElementById('featuresContainer');
     const div = document.createElement('div');
@@ -1906,7 +2095,6 @@ document.getElementById('addFeatureBtn').addEventListener('click', function() {
     `;
     container.appendChild(div);
     
-    // Add remove functionality
     div.querySelector('.remove-feature-btn').addEventListener('click', function() {
         if (document.querySelectorAll('.feature-input-group').length > 1) {
             div.remove();
@@ -1914,7 +2102,9 @@ document.getElementById('addFeatureBtn').addEventListener('click', function() {
     });
 });
 
-// Image preview functionality
+// ====================================
+// IMAGE PREVIEW
+// ====================================
 document.getElementById('product_images').addEventListener('change', function(e) {
     const preview = document.getElementById('imagePreview');
     const featuredSelect = document.getElementById('featured_image');
@@ -1927,7 +2117,6 @@ document.getElementById('product_images').addEventListener('change', function(e)
         const reader = new FileReader();
         
         reader.onload = function(e) {
-            // Create preview image
             const img = document.createElement('img');
             img.src = e.target.result;
             img.style.width = '100px';
@@ -1937,7 +2126,6 @@ document.getElementById('product_images').addEventListener('change', function(e)
             img.style.border = '2px solid #ddd';
             preview.appendChild(img);
             
-            // Add option to featured select
             const option = document.createElement('option');
             option.value = i;
             option.textContent = file.name;
@@ -1947,40 +2135,37 @@ document.getElementById('product_images').addEventListener('change', function(e)
         reader.readAsDataURL(file);
     }
     
-    // Show featured image container if images are uploaded
     if (files.length > 0) {
         document.getElementById('featuredImageContainer').style.display = 'block';
     }
 });
 
+// ====================================
+// EDIT MODAL SETUP
+// ====================================
 document.addEventListener('DOMContentLoaded', function() {
-    // Edit product functionality
     setupEditModal();
 });
-// Edit product functionality - REVISED
+
 function setupEditModal() {
-    // Use event delegation for dynamically loaded content
     document.addEventListener('click', function(e) {
         if (e.target.closest('.action-btn.edit')) {
             const button = e.target.closest('.action-btn.edit');
             const productId = button.getAttribute('data-id');
             
-            // Clear any previous data
             document.getElementById('editFeaturesContainer').innerHTML = '';
             document.getElementById('editImagesList').innerHTML = '';
             document.getElementById('editImagePreview').innerHTML = '';
             document.getElementById('editFeaturedImageContainer').style.display = 'none';
             
-            // Fetch product data
             fetch(`get_product.php?id=${productId}`)
                 .then(response => response.json())
                 .then(data => {
                     if (!data.success) {
-                        alert('Error: ' + data.message);
+                        showToast('error', 'Error', data.message);
                         return;
                     }
                     
-                    // Populate EDIT modal fields
                     document.getElementById('editProductId').value = data.id;
                     document.getElementById('editName').value = data.name;
                     document.getElementById('editDescription').value = data.description;
@@ -1989,34 +2174,28 @@ function setupEditModal() {
                     document.getElementById('editCategory').value = data.category;
                     document.getElementById('editFeatured').checked = data.featured == 1;
                     
-                    // Populate features
                     const featuresContainer = document.getElementById('editFeaturesContainer');
                     featuresContainer.innerHTML = '';
                     
                     if (data.features && data.features.length > 0) {
-                        data.features.forEach((feature, index) => {
+                        data.features.forEach((feature) => {
                             addEditFeatureInput(feature.feature_text || feature);
                         });
                     } else {
-                        // Add at least one empty feature input
                         addEditFeatureInput('');
                     }
                     
-                    // Load existing images
                     loadExistingImages(productId);
-                    
-                    // Show the EDIT modal
                     document.getElementById('editProductModal').style.display = 'flex';
                 })
                 .catch(error => {
                     console.error('Error fetching product:', error);
-                    alert('Error loading product data. Check console for details.');
+                    showToast('error', 'Error', 'Error loading product data.');
                 });
         }
     });
 }
 
-// Function to load existing images
 function loadExistingImages(productId) {
     fetch(`get_product_images.php?id=${productId}`)
         .then(response => response.json())
@@ -2041,7 +2220,6 @@ function loadExistingImages(productId) {
                 featuredSelect.innerHTML = '<option value="">Select featured image</option>';
                 
                 data.forEach((image, index) => {
-                    // Add to images list
                     const imgDiv = document.createElement('div');
                     imgDiv.className = 'image-thumbnail';
                     imgDiv.style.position = 'relative';
@@ -2054,7 +2232,6 @@ function loadExistingImages(productId) {
                     `;
                     imagesList.appendChild(imgDiv);
                     
-                    // Add to featured image dropdown
                     const option = document.createElement('option');
                     option.value = image.image_path;
                     option.textContent = `Image ${index + 1}`;
@@ -2076,43 +2253,6 @@ function loadExistingImages(productId) {
         });
 }
 
-document.addEventListener('DOMContentLoaded', function () {
-
-    const form = document.getElementById('productForm');
-
-    form.addEventListener('submit', function(e) {
-        e.preventDefault();
-
-        const formData = new FormData(this);
-
-        fetch('add_product.php', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-
-            if (data.success) {
-                alert(data.message);
-
-                // Redirect properly
-                window.location.href = data.redirect || 'product.php';
-
-            } else {
-                alert('Error: ' + data.message);
-            }
-
-        })
-        .catch(err => {
-            console.error(err);
-            alert('Something went wrong.');
-        });
-
-    });
-
-});
-
-// Function to add feature input in edit modal
 function addEditFeatureInput(value = '') {
     const container = document.getElementById('editFeaturesContainer');
     const div = document.createElement('div');
@@ -2128,7 +2268,6 @@ function addEditFeatureInput(value = '') {
     `;
     container.appendChild(div);
     
-    // Add remove functionality
     div.querySelector('.remove-feature-btn').addEventListener('click', function() {
         if (document.querySelectorAll('#editFeaturesContainer .feature-input-group').length > 1) {
             div.remove();
@@ -2136,51 +2275,19 @@ function addEditFeatureInput(value = '') {
     });
 }
 
-// Add feature button for edit modal
 document.getElementById('editAddFeatureBtn').addEventListener('click', function() {
     addEditFeatureInput('');
 });
 
-// Function to fetch product images
-function fetchProductImages(productId) {
-    fetch(`get_product_images.php?id=${productId}`)
-        .then(response => response.json())
-        .then(images => {
-            const imagesList = document.getElementById('editImagesList');
-            imagesList.innerHTML = '';
-            
-            if (images && images.length > 0) {
-                images.forEach(image => {
-                    const imgDiv = document.createElement('div');
-                    imgDiv.className = 'thumbnail';
-                    imgDiv.innerHTML = `
-                        <img src="${image.image_path}" alt="Product image" style="width: 100%; height: 80px; object-fit: cover; border-radius: 4px;">
-                        <div style="font-size: 10px; text-align: center; margin-top: 5px;">
-                            ${image.is_featured ? '<i class="fa-solid fa-star" style="color: gold;"></i> Featured' : 'Image'}
-                        </div>
-                    `;
-                    imagesList.appendChild(imgDiv);
-                });
-            } else {
-                imagesList.innerHTML = '<p style="color: var(--gray); font-size: 14px;">No images uploaded yet.</p>';
-            }
-        })
-        .catch(error => {
-            console.error('Error fetching images:', error);
-            document.getElementById('editImagesList').innerHTML = 
-                '<p style="color: var(--danger); font-size: 14px;">Error loading images.</p>';
-        });
-}
-
-// Close edit modal
 function closeEditModal() {
     document.getElementById('editProductModal').style.display = 'none';
 }
 
-// Close edit modal button
 document.getElementById('closeEditModal').addEventListener('click', closeEditModal);
 
-// Image preview for edit modal
+// ====================================
+// EDIT IMAGE PREVIEW
+// ====================================
 document.getElementById('editProductImages').addEventListener('change', function(e) {
     const preview = document.getElementById('editImagePreview');
     const featuredSelect = document.getElementById('editFeaturedImage');
@@ -2193,7 +2300,6 @@ document.getElementById('editProductImages').addEventListener('change', function
         const reader = new FileReader();
         
         reader.onload = function(e) {
-            // Create preview image
             const img = document.createElement('img');
             img.src = e.target.result;
             img.style.width = '100px';
@@ -2203,7 +2309,6 @@ document.getElementById('editProductImages').addEventListener('change', function
             img.style.border = '2px solid #ddd';
             preview.appendChild(img);
             
-            // Add option to featured select
             const option = document.createElement('option');
             option.value = i;
             option.textContent = file.name;
@@ -2213,19 +2318,49 @@ document.getElementById('editProductImages').addEventListener('change', function
         reader.readAsDataURL(file);
     }
     
-    // Show featured image container if new images are uploaded
     if (files.length > 0) {
         document.getElementById('editFeaturedImageContainer').style.display = 'block';
     }
 });
 
-// Form submission for edit modal
+// ====================================
+// FORM SUBMISSIONS
+// ====================================
+document.addEventListener('DOMContentLoaded', function () {
+    const form = document.getElementById('productForm');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            
+            fetch('add_product.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast('success', 'Product Added', data.message || 'Product has been added successfully.');
+                    setTimeout(() => {
+                        window.location.href = data.redirect || 'product.php';
+                    }, 1500);
+                } else {
+                    showToast('error', 'Error', data.message || 'Failed to add product.');
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                showToast('error', 'Error', 'Something went wrong.');
+            });
+        });
+    }
+});
+
+// Edit form submission
 document.getElementById('editProductForm').addEventListener('submit', function(e) {
     e.preventDefault();
     
     const formData = new FormData(this);
-    
-    // Add AJAX header
     const xhr = new XMLHttpRequest();
     
     xhr.onreadystatechange = function() {
@@ -2233,15 +2368,15 @@ document.getElementById('editProductForm').addEventListener('submit', function(e
             try {
                 const response = JSON.parse(xhr.responseText);
                 if (response.success) {
-                    alert('Product updated successfully!');
+                    showToast('success', 'Product Updated', 'Product has been updated successfully.');
                     closeEditModal();
-                    location.reload();
+                    setTimeout(() => location.reload(), 1500);
                 } else {
-                    alert('Error: ' + response.message);
+                    showToast('error', 'Error', response.message || 'Failed to update product.');
                 }
             } catch (e) {
                 console.error('Error parsing response:', e);
-                alert('An error occurred. Please check the console for details.');
+                showToast('error', 'Error', 'An error occurred. Please check the console for details.');
             }
         }
     };
@@ -2251,25 +2386,116 @@ document.getElementById('editProductForm').addEventListener('submit', function(e
     xhr.send(formData);
 });
 
-// Delete product functionality
-document.querySelectorAll('.action-btn.delete').forEach(button => {
-    button.addEventListener('click', function() {
-        const productId = this.getAttribute('data-id');
-        if (confirm('Are you sure you want to delete this product?')) {
-            fetch(`delete_product.php?id=${productId}`, { method: 'DELETE' })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        location.reload();
-                    } else {
-                        alert('Error deleting product: ' + data.message);
-                    }
-                });
-        }
-    });
+// ====================================
+// DELETE PRODUCT FUNCTIONALITY
+// ====================================
+// Handle delete button clicks (event delegation)
+document.addEventListener('click', function(e) {
+    const deleteBtn = e.target.closest('.action-btn.delete');
+    if (!deleteBtn) return;
+    
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const productId = deleteBtn.getAttribute('data-id');
+    
+    if (!productId) {
+        showToast('error', 'Error', 'Product ID not found!');
+        return;
+    }
+    
+    const productItem = deleteBtn.closest('.product-item');
+    const productName = productItem 
+        ? productItem.querySelector('.product-title').textContent.trim() 
+        : 'Unknown Product';
+    
+    openDeleteModal(productId, productName);
 });
 
-// Add CSS for category buttons
+// Handle confirm delete button
+document.getElementById('confirmDeleteBtn').addEventListener('click', async function() {
+    if (!pendingDeleteData) {
+        console.error('No pending delete data');
+        return;
+    }
+    
+    const { id: productId, name: productName } = pendingDeleteData;
+    const deleteBtn = this;
+    
+    const originalHTML = deleteBtn.innerHTML;
+    deleteBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Deleting...';
+    deleteBtn.disabled = true;
+    
+    try {
+        const response = await fetch(`delete_product.php?id=${productId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            closeDeleteModal();
+            showToast('success', 'Product Deleted', `"${productName}" has been successfully deleted.`, 4000);
+            
+            // Remove product card with animation
+            const productCards = document.querySelectorAll('.product-item');
+            productCards.forEach(card => {
+                const delBtn = card.querySelector(`.action-btn.delete[data-id="${productId}"]`);
+                if (delBtn) {
+                    card.style.transition = 'all 0.3s ease';
+                    card.style.opacity = '0';
+                    card.style.transform = 'scale(0.8)';
+                    setTimeout(() => {
+                        card.remove();
+                        const remaining = document.querySelectorAll('.product-item');
+                        if (remaining.length === 0) {
+                            setTimeout(() => location.reload(), 500);
+                        }
+                        updateProductStats();
+                    }, 300);
+                }
+            });
+        } else {
+            showToast('error', 'Delete Failed', data.message || 'Failed to delete product.');
+            deleteBtn.innerHTML = originalHTML;
+            deleteBtn.disabled = false;
+        }
+    } catch (error) {
+        console.error('Delete error:', error);
+        showToast('error', 'Error', 'An unexpected error occurred.');
+        deleteBtn.innerHTML = '<i class="fa-solid fa-trash"></i> Delete Product';
+        deleteBtn.disabled = false;
+    }
+});
+
+// Update stats after deletion
+function updateProductStats() {
+    const totalProductsEl = document.querySelector('.stat-card.total .number');
+    if (totalProductsEl) {
+        const currentCount = document.querySelectorAll('.product-item:not([style*="opacity: 0"])').length;
+        totalProductsEl.textContent = currentCount;
+    }
+}
+
+// ====================================
+// INITIALIZE REMOVE FEATURE BUTTONS
+// ====================================
+document.addEventListener('click', function(e) {
+    if (e.target.closest('.remove-feature-btn')) {
+        const featureGroup = e.target.closest('.feature-input-group');
+        if (document.querySelectorAll('.feature-input-group').length > 1) {
+            featureGroup.remove();
+        }
+    }
+});
+
+// ====================================
+// ADD CATEGORY BUTTON STYLES
+// ====================================
 const style = document.createElement('style');
 style.textContent = `
     .category-btn {
@@ -2326,18 +2552,6 @@ style.textContent = `
     }
 `;
 document.head.appendChild(style);
-
-// Initialize remove feature buttons
-document.addEventListener('click', function(e) {
-    if (e.target.closest('.remove-feature-btn')) {
-        const featureGroup = e.target.closest('.feature-input-group');
-        if (document.querySelectorAll('.feature-input-group').length > 1) {
-            featureGroup.remove();
-        }
-    }
-});
-
-
 </script>
 </body>
 </html>

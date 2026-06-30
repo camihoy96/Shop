@@ -1209,6 +1209,36 @@ if ($result) {
                 border-bottom-color: var(--light-gray);
             }
         }
+        /* Order Confirmation Modal Animation */
+#orderConfirmModal {
+    animation: fadeIn 0.3s ease;
+}
+
+#orderConfirmModal .modal-content {
+    animation: slideUp 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideUp {
+    from { 
+        transform: translateY(50px); 
+        opacity: 0; 
+    }
+    to { 
+        transform: translateY(0); 
+        opacity: 1; 
+    }
+}
+
+/* Button hover effects */
+#orderConfirmBtn:hover {
+    filter: brightness(1.1);
+    transform: translateY(-1px);
+}
     </style>
 </head>
 <body>
@@ -2006,115 +2036,335 @@ if ($result) {
             });
         }
 
-        // Delete Order
-        function deleteOrder(orderId) {
-            if (confirm('Are you sure you want to delete this order? This action cannot be undone.')) {
-                fetch(`delete_order.php?id=${orderId}`, {
-                    method: 'DELETE'
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        alert('Order deleted successfully!');
-                        location.reload();
-                    } else {
-                        alert('Error: ' + data.message);
+      // ====================================
+// ORDER MANAGEMENT FUNCTIONS - FIXED
+// ====================================
+
+// Delete Order - FIXED
+function deleteOrder(orderId) {
+    const row = document.querySelector(`tr[data-order-id='${orderId}']`);
+    const orderNumber = row ? (row.querySelector('.order-id')?.textContent?.trim() || `#${orderId}`) : `#${orderId}`;
+    
+    showOrderConfirmModal({
+        title: 'Delete Order',
+        icon: 'fa-trash-can',
+        message: `Are you sure you want to delete order <strong>${orderNumber}</strong>?`,
+        subMessage: 'This action cannot be undone. All order data will be permanently removed.',
+        confirmText: 'Delete Order',
+        confirmClass: 'danger',
+        onConfirm: async () => {
+            try {
+                // Use POST method with query parameter
+                const response = await fetch(`delete_order.php?id=${orderId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
                     }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('Error deleting order');
                 });
+                
+                // Log the raw response for debugging
+                const rawText = await response.text();
+                console.log('Raw response:', rawText);
+                
+                // Try to parse JSON
+                let data;
+                try {
+                    data = JSON.parse(rawText);
+                } catch (e) {
+                    console.error('JSON parse error:', e);
+                    showToast('error', 'Error', 'Invalid server response. Check console for details.');
+                    return;
+                }
+                
+                console.log('Delete response data:', data);
+                
+                if (data.success) {
+                    // Remove row with animation
+                    if (row) {
+                        row.style.transition = 'all 0.3s ease';
+                        row.style.opacity = '0';
+                        row.style.transform = 'translateX(20px)';
+                        setTimeout(() => {
+                            row.remove();
+                            updateOrderStats();
+                        }, 300);
+                    }
+                    
+                    showToast('success', 'Order Deleted', data.message || `Order ${orderNumber} deleted successfully.`);
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    showToast('error', 'Delete Failed', data.message || 'Failed to delete order. Check console for details.');
+                }
+            } catch (error) {
+                console.error('Fetch error:', error);
+                showToast('error', 'Error', 'Network error. Please try again.');
             }
         }
-
-        // Accept Order (move from pending to accepted)
-        function acceptOrder(id) {
-            if (!confirm("Accept this order and mark as PROCESSING?")) return;
-
-            fetch('accept_order.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: id })
-            })
-            .then(res => res.json())
-            .then(data => {
+    });
+}
+// Accept Order (move from pending to processing)
+function acceptOrder(id) {
+    const row = document.querySelector(`tr[data-order-id='${id}']`);
+    const orderNumber = row ? (row.querySelector('.order-id')?.textContent?.trim() || `#${id}`) : `#${id}`;
+    
+    showOrderConfirmModal({
+        title: 'Accept Order',
+        icon: 'fa-clipboard-check',
+        message: `Accept order <strong>${orderNumber}</strong> and mark as <strong>PROCESSING</strong>?`,
+        subMessage: 'This will move the order from Pending to Processing status.',
+        confirmText: 'Accept Order',
+        confirmClass: 'success',
+        onConfirm: async () => {
+            try {
+                const response = await fetch('accept_order.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: id })
+                });
+                const data = await response.json();
+                
                 if (data.success) {
-                    // Remove row from table
-                    const row = document.querySelector(`tr[data-order-id='${id}']`);
-                    if (row) row.remove();
+                    // Remove row with animation
+                    if (row) {
+                        row.style.transition = 'all 0.3s ease';
+                        row.style.opacity = '0';
+                        row.style.transform = 'translateX(20px)';
+                        setTimeout(() => {
+                            row.remove();
+                            updatePendingBadge();
+                            updateOrderStats();
+                        }, 300);
+                    }
                     
-                    // Update pending orders badge
-                    updatePendingBadge();
+                    showToast('success', 'Order Accepted', `Order ${orderNumber} has been moved to Processing.`);
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    showToast('error', 'Failed', data.message || 'Failed to accept order.');
+                }
+            } catch (err) {
+                console.error(err);
+                showToast('error', 'Error', 'System error while accepting order.');
+            }
+        }
+    });
+}
+
+// Mark order as shipped
+function markAsShipped(id) {
+    const row = document.querySelector(`tr[data-order-id='${id}']`);
+    const orderNumber = row ? (row.querySelector('.order-id')?.textContent?.trim() || `#${id}`) : `#${id}`;
+    
+    showOrderConfirmModal({
+        title: 'Mark as Shipped',
+        icon: 'fa-truck-fast',
+        message: `Mark order <strong>${orderNumber}</strong> as <strong>SHIPPED</strong>?`,
+        subMessage: 'The customer will be notified that their order is on the way.',
+        confirmText: 'Mark as Shipped',
+        confirmClass: 'primary',
+        onConfirm: async () => {
+            try {
+                const response = await fetch('update_order_status.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        id: id, 
+                        status: 'shipped',
+                        action: 'ship'
+                    })
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    showToast('success', 'Order Shipped', `Order ${orderNumber} has been marked as shipped.`);
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    showToast('error', 'Failed', data.message || 'Failed to update order.');
+                }
+            } catch (err) {
+                console.error(err);
+                showToast('error', 'Error', 'System error while updating order.');
+            }
+        }
+    });
+}
+
+// Mark order as delivered (move to history)
+function markAsDelivered(id) {
+    const row = document.querySelector(`tr[data-order-id='${id}']`);
+    const orderNumber = row ? (row.querySelector('.order-id')?.textContent?.trim() || `#${id}`) : `#${id}`;
+    
+    showOrderConfirmModal({
+        title: 'Mark as Delivered',
+        icon: 'fa-box-check',
+        message: `Mark order <strong>${orderNumber}</strong> as <strong>DELIVERED</strong>?`,
+        subMessage: 'This will move the order to Order History.',
+        confirmText: 'Mark as Delivered',
+        confirmClass: 'success',
+        onConfirm: async () => {
+            try {
+                const response = await fetch('update_order_status.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        id: id, 
+                        status: 'delivered',
+                        action: 'deliver'
+                    })
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    showToast('success', 'Order Delivered', `Order ${orderNumber} has been marked as delivered.`);
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    showToast('error', 'Failed', data.message || 'Failed to update order.');
+                }
+            } catch (err) {
+                console.error(err);
+                showToast('error', 'Error', 'System error while updating order.');
+            }
+        }
+    });
+}
+
+// ====================================
+// ORDER CONFIRMATION MODAL - FIXED
+// ====================================
+function showOrderConfirmModal({ title, icon, message, subMessage, confirmText, confirmClass, onConfirm }) {
+    // Remove existing modal if any
+    const existingModal = document.getElementById('orderConfirmModal');
+    if (existingModal) existingModal.remove();
+    
+    // Create modal HTML
+    const modalHTML = `
+        <div id="orderConfirmModal" class="modal" style="display:flex;">
+            <div class="modal-content" style="width: 450px; max-width: 90%;">
+                <div class="modal-header" style="border-bottom: 2px solid ${getColorByClass(confirmClass)};">
+                    <h3 style="color: ${getColorByClass(confirmClass)};">
+                        <i class="fa-solid ${icon}"></i> ${title}
+                    </h3>
+                    <button class="close-btn" onclick="closeOrderConfirmModal()">&times;</button>
+                </div>
+                
+                <div style="padding: 25px; text-align: center;">
+                    <div style="font-size: 48px; color: ${getColorByClass(confirmClass)}; margin-bottom: 20px;">
+                        <i class="fa-solid ${icon}"></i>
+                    </div>
                     
-                    // Show success message
-                    alert("Order accepted successfully. It has been moved to Accepted Orders tab.");
-                } else {
-                    alert(data.message || "Failed to accept order");
-                }
-            })
-            .catch(err => {
-                console.error(err);
-                alert("System error while accepting order");
-            });
+                    <p style="font-size: 16px; color: var(--dark); margin-bottom: 10px;">
+                        ${message}
+                    </p>
+                    
+                    ${subMessage ? `
+                        <p style="font-size: 14px; color: var(--gray); margin-bottom: 25px;">
+                            <i class="fa-solid fa-circle-info"></i> ${subMessage}
+                        </p>
+                    ` : ''}
+                    
+                    <div style="display: flex; gap: 10px;">
+                        <button type="button" onclick="closeOrderConfirmModal()" class="btn" style="flex: 1; background: var(--gray);">
+                            <i class="fa-solid fa-times"></i> Cancel
+                        </button>
+                        <button type="button" id="orderConfirmBtn" class="btn" style="flex: 1; background: ${getBgByClass(confirmClass)};">
+                            <i class="fa-solid ${icon}"></i> ${confirmText}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Add modal to body
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    document.body.style.overflow = 'hidden';
+    
+    // Add event listener to confirm button
+    const confirmBtn = document.getElementById('orderConfirmBtn');
+    confirmBtn.addEventListener('click', async function() {
+        const originalHTML = this.innerHTML;
+        this.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing...';
+        this.disabled = true;
+        
+        try {
+            await onConfirm();
+        } catch (error) {
+            console.error('Confirm action error:', error);
+            showToast('error', 'Error', 'An error occurred while processing your request.');
         }
-
-        // Mark order as shipped
-        function markAsShipped(id) {
-            if (!confirm("Mark this order as SHIPPED?")) return;
-
-            fetch('update_order_status.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    id: id, 
-                    status: 'shipped',
-                    action: 'ship'
-                })
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    alert("Order marked as shipped successfully!");
-                    location.reload();
-                } else {
-                    alert(data.message || "Failed to update order");
-                }
-            })
-            .catch(err => {
-                console.error(err);
-                alert("System error while updating order");
-            });
+        
+        // Modal will be closed by the onConfirm function or we close it here
+        setTimeout(() => closeOrderConfirmModal(), 500);
+    });
+    
+    // Close when clicking outside
+    document.getElementById('orderConfirmModal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeOrderConfirmModal();
         }
-
-        // Mark order as delivered (move to history)
-        function markAsDelivered(id) {
-            if (!confirm("Mark this order as DELIVERED and move to Order History?")) return;
-
-            fetch('update_order_status.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    id: id, 
-                    status: 'delivered',
-                    action: 'deliver'
-                })
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    alert("Order marked as delivered successfully! It has been moved to Order History.");
-                    location.reload();
-                } else {
-                    alert(data.message || "Failed to update order");
-                }
-            })
-            .catch(err => {
-                console.error(err);
-                alert("System error while updating order");
-            });
+    });
+    
+    // Close with Escape key
+    const escHandler = function(e) {
+        if (e.key === 'Escape') {
+            closeOrderConfirmModal();
+            document.removeEventListener('keydown', escHandler);
         }
+    };
+    document.addEventListener('keydown', escHandler);
+}
 
+function closeOrderConfirmModal() {
+    const modal = document.getElementById('orderConfirmModal');
+    if (modal) {
+        modal.style.opacity = '0';
+        modal.style.transition = 'opacity 0.2s ease';
+        setTimeout(() => {
+            if (modal.parentNode) {
+                modal.remove();
+            }
+            document.body.style.overflow = 'auto';
+        }, 200);
+    }
+}
+
+// Helper functions for modal styling
+function getColorByClass(className) {
+    const colors = {
+        'danger': '#dc3545',
+        'success': '#28a745',
+        'primary': '#075aae',
+        'warning': '#ffc107'
+    };
+    return colors[className] || '#075aae';
+}
+
+function getBgByClass(className) {
+    const backgrounds = {
+        'danger': '#dc3545',
+        'success': '#28a745',
+        'primary': '#075aae',
+        'warning': '#ffc107'
+    };
+    return backgrounds[className] || '#075aae';
+}
+
+// ====================================
+// HELPER FUNCTIONS
+// ====================================
+function updateOrderStats() {
+    updatePendingBadge();
+}
+
+function updatePendingBadge() {
+    const pendingRows = document.querySelectorAll('tr[data-order-status="pending"]:not([style*="opacity: 0"])');
+    const badge = document.querySelector('.orderbadge');
+    if (badge) {
+        const count = pendingRows.length;
+        badge.textContent = count;
+        badge.style.display = count > 0 ? 'inline' : 'none';
+    }
+}
         // Print invoice
         function printInvoice(id) {
             window.open(`print_invoice.php?id=${id}`, '_blank');
@@ -2234,6 +2484,82 @@ if ($result) {
                 });
             <?php endif; ?>
         });
+        // ====================================
+// TOAST NOTIFICATION SYSTEM
+// ====================================
+function showToast(type, title, message, duration = 3000) {
+    // Create toast container if it doesn't exist
+    let container = document.getElementById('toastContainer');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toastContainer';
+        container.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px;';
+        document.body.appendChild(container);
+    }
+    
+    const icons = {
+        success: 'fa-circle-check',
+        error: 'fa-circle-xmark',
+        warning: 'fa-triangle-exclamation',
+        info: 'fa-circle-info'
+    };
+    
+    const colors = {
+        success: 'linear-gradient(135deg, #28a745, #20c997)',
+        error: 'linear-gradient(135deg, #dc3545, #e74c3c)',
+        warning: 'linear-gradient(135deg, #ffc107, #fd7e14)',
+        info: 'linear-gradient(135deg, #17a2b8, #0dcaf0)'
+    };
+    
+    const toast = document.createElement('div');
+    toast.style.cssText = `
+        padding: 16px 20px;
+        border-radius: 8px;
+        color: white;
+        font-weight: 500;
+        min-width: 300px;
+        max-width: 400px;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        animation: slideInRight 0.3s ease, fadeOut 0.3s ease ${duration - 300}ms;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-family: 'Montserrat', sans-serif;
+        background: ${colors[type] || colors.info};
+        border-left: 4px solid rgba(255,255,255,0.3);
+    `;
+    
+    toast.innerHTML = `
+        <i class="fa-solid ${icons[type] || icons.info}" style="font-size: 20px;"></i>
+        <div style="flex: 1;">
+            <div style="font-weight: 600; font-size: 14px; margin-bottom: 2px;">${title}</div>
+            ${message ? `<div style="font-size: 13px; opacity: 0.9;">${message}</div>` : ''}
+        </div>
+    `;
+    
+    container.appendChild(toast);
+    
+    // Remove toast after animation
+    setTimeout(() => {
+        if (toast.parentNode) {
+            toast.remove();
+        }
+    }, duration);
+}
+
+// Add toast animation styles
+const toastStyle = document.createElement('style');
+toastStyle.textContent = `
+    @keyframes slideInRight {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+    @keyframes fadeOut {
+        from { opacity: 1; }
+        to { opacity: 0; }
+    }
+`;
+document.head.appendChild(toastStyle);
     </script>
 </body>
 </html>
